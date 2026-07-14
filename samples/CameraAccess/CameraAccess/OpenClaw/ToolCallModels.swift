@@ -8,52 +8,64 @@ struct GeminiFunctionCall {
   let args: [String: Any]
 }
 
-struct GeminiToolCall {
-  let functionCalls: [GeminiFunctionCall]
+// struct GeminiToolCall {
+//   let functionCalls: [GeminiFunctionCall]
 
-  init?(json: [String: Any]) {
-    guard let toolCall = json["toolCall"] as? [String: Any],
-          let calls = toolCall["functionCalls"] as? [[String: Any]] else {
-      return nil
-    }
-    self.functionCalls = calls.compactMap { call in
-      guard let id = call["id"] as? String,
-            let name = call["name"] as? String else { return nil }
-      let args = call["args"] as? [String: Any] ?? [:]
-      return GeminiFunctionCall(id: id, name: name, args: args)
-    }
-  }
-}
+//   init?(json: [String: Any]) {
+//     guard let toolCall = json["toolCall"] as? [String: Any],
+//           let calls = toolCall["functionCalls"] as? [[String: Any]] else {
+//       return nil
+//     }
+//     self.functionCalls = calls.compactMap { call in
+//       guard let id = call["id"] as? String,
+//             let name = call["name"] as? String else { return nil }
+//       let args = call["args"] as? [String: Any] ?? [:]
+//       return GeminiFunctionCall(id: id, name: name, args: args)
+//     }
+//   }
+// }
 
 // MARK: - Gemini Tool Call Cancellation
 
-struct GeminiToolCallCancellation {
-  let ids: [String]
+// struct GeminiToolCallCancellation {
+//   let ids: [String]
 
-  init?(json: [String: Any]) {
-    guard let cancellation = json["toolCallCancellation"] as? [String: Any],
-          let ids = cancellation["ids"] as? [String] else {
-      return nil
-    }
-    self.ids = ids
-  }
-}
+//   init?(json: [String: Any]) {
+//     guard let cancellation = json["toolCallCancellation"] as? [String: Any],
+//           let ids = cancellation["ids"] as? [String] else {
+//       return nil
+//     }
+//     self.ids = ids
+//   }
+// }
 
 // MARK: - Tool Result
 
 enum ToolResult {
-  case success(String)
-  case failure(String)
+    case success(String)
+    case failure(String)
 
-  var responseValue: [String: Any] {
-    switch self {
-    case .success(let result):
-      return ["result": result]
-    case .failure(let error):
-      return ["error": error]
+    var outputString: String {
+        switch self {
+        case .success(let result): return result
+        case .failure(let error): return "Error: \(error)"
+        }
     }
-  }
 }
+
+// enum ToolResult {
+//   case success(String)
+//   case failure(String)
+
+//   var responseValue: [String: Any] {
+//     switch self {
+//     case .success(let result):
+//       return ["result": result]
+//     case .failure(let error):
+//       return ["error": error]
+//     }
+//   }
+// }
 
 // MARK: - Tool Call Status (for UI)
 

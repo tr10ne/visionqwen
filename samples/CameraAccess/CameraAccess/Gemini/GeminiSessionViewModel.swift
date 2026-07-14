@@ -25,8 +25,8 @@ class GeminiSessionViewModel: ObservableObject {
     guard !isGeminiActive else { return }
 
     guard GeminiConfig.isConfigured else {
-      errorMessage = "Gemini API key not configured. Open GeminiConfig.swift and replace YOUR_GEMINI_API_KEY with your key from https://aistudio.google.com/apikey"
-      return
+        errorMessage = "DashScope API key not configured. Open GeminiConfig.swift and replace YOUR_GEMINI_API_KEY with your key from https://bailian.console.aliyun.com/"
+        return
     }
 
     isGeminiActive = true
@@ -91,23 +91,32 @@ class GeminiSessionViewModel: ObservableObject {
     // Wire tool call handling
     toolCallRouter = ToolCallRouter(bridge: openClawBridge)
 
-    geminiService.onToolCall = { [weak self] toolCall in
+    geminiService.onToolCall = { [weak self] call in
       guard let self else { return }
       Task { @MainActor in
-        for call in toolCall.functionCalls {
-          self.toolCallRouter?.handleToolCall(call) { [weak self] response in
-            self?.geminiService.sendToolResponse(response)
+          self.toolCallRouter?.handleToolCall(call) { [weak self] callId, output in
+              self?.geminiService.sendToolResponse(callId: callId, output: output)
           }
-        }
       }
-    }
+  }
 
-    geminiService.onToolCallCancellation = { [weak self] cancellation in
-      guard let self else { return }
-      Task { @MainActor in
-        self.toolCallRouter?.cancelToolCalls(ids: cancellation.ids)
-      }
-    }
+    // geminiService.onToolCall = { [weak self] toolCall in
+    //   guard let self else { return }
+    //   Task { @MainActor in
+    //     for call in toolCall.functionCalls {
+    //       self.toolCallRouter?.handleToolCall(call) { [weak self] response in
+    //         self?.geminiService.sendToolResponse(response)
+    //       }
+    //     }
+    //   }
+    // }
+
+    // geminiService.onToolCallCancellation = { [weak self] cancellation in
+    //   guard let self else { return }
+    //   Task { @MainActor in
+    //     self.toolCallRouter?.cancelToolCalls(ids: cancellation.ids)
+    //   }
+    // }
 
     // Observe service state
     stateObservation = Task { [weak self] in

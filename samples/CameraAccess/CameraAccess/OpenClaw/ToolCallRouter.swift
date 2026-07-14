@@ -15,7 +15,7 @@ class ToolCallRouter {
   /// JSON dictionary to send back as a toolResponse message.
   func handleToolCall(
     _ call: GeminiFunctionCall,
-    sendResponse: @escaping ([String: Any]) -> Void
+    sendResponse: @escaping (_ callId: String, _ output: String) -> Void
   ) {
     let callId = call.id
     let callName = call.name
@@ -25,15 +25,8 @@ class ToolCallRouter {
 
     // Circuit breaker: stop sending tool calls after repeated failures
     if consecutiveFailures >= maxConsecutiveFailures {
-      NSLog("[ToolCall] Circuit breaker open (%d consecutive failures), rejecting %@",
-            consecutiveFailures, callId)
-      let errorResult: ToolResult = .failure(
-        "Tool execution is temporarily unavailable after \(consecutiveFailures) consecutive failures. " +
-        "Please tell the user you cannot complete this action right now and suggest they check their OpenClaw gateway connection."
-      )
-      let response = buildToolResponse(callId: callId, name: callName, result: errorResult)
-      sendResponse(response)
-      return
+        sendResponse(callId, "Tool execution is temporarily unavailable...")
+        return
     }
 
     let task = Task { @MainActor in
@@ -55,10 +48,9 @@ class ToolCallRouter {
       NSLog("[ToolCall] Result for %@ (id: %@): %@",
             callName, callId, String(describing: result))
 
-      let response = self.buildToolResponse(callId: callId, name: callName, result: result)
-      sendResponse(response)
-
-      self.inFlightTasks.removeValue(forKey: callId)
+        let response = result.outputString
+          sendResponse(callId, response)
+          self.inFlightTasks.removeValue(forKey: callId)
     }
 
     inFlightTasks[callId] = task
@@ -88,21 +80,21 @@ class ToolCallRouter {
 
   // MARK: - Private
 
-  private func buildToolResponse(
-    callId: String,
-    name: String,
-    result: ToolResult
-  ) -> [String: Any] {
-    return [
-      "toolResponse": [
-        "functionResponses": [
-          [
-            "id": callId,
-            "name": name,
-            "response": result.responseValue
-          ]
-        ]
-      ]
-    ]
-  }
+  // private func buildToolResponse(
+  //   callId: String,
+  //   name: String,
+  //   result: ToolResult
+  // ) -> [String: Any] {
+  //   return [
+  //     "toolResponse": [
+  //       "functionResponses": [
+  //         [
+  //           "id": callId,
+  //           "name": name,
+  //           "response": result.responseValue
+  //         ]
+  //       ]
+  //     ]
+  //   ]
+  // }
 }
