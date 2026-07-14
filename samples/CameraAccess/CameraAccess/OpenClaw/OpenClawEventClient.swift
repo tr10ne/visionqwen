@@ -140,8 +140,8 @@ class OpenClawEventClient {
       "id": UUID().uuidString,
       "method": "connect",
       "params": [
-        "minProtocol": 3,
-        "maxProtocol": 3,
+        "minProtocol": 4,
+        "maxProtocol": 4,
         "client": [
           "id": "ios-node",
           "displayName": "VisionClaw Glass",
