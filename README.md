@@ -1,12 +1,14 @@
-# VisionClaw
+# VisionQwen
 
-![VisionClaw](assets/teaserimage.png)
+![VisionQwen](assets/teaserimage.png)
 
-A real-time AI assistant for Meta Ray-Ban smart glasses. See what you see, hear what you say, and take actions on your behalf -- all through voice.
+A real-time AI assistant for Meta Ray-Ban smart glasses powered by **Qwen** (or any OpenAI-compatible API). See what you see, hear what you say, and take actions on your behalf — all through voice.
+
+This is a fork of [VisionClaw](https://github.com/sseanliu/VisionClaw) with Gemini Live replaced by Qwen vision-language models via OpenAI-compatible endpoints.
 
 ![Cover](assets/cover.png)
 
-Built on [Meta Wearables DAT SDK](https://github.com/facebook/meta-wearables-dat-ios) (iOS) / [DAT Android SDK](https://github.com/nichochar/openclaw) (Android) + [Gemini Live API](https://ai.google.dev/gemini-api/docs/live) + [OpenClaw](https://github.com/nichochar/openclaw) (optional).
+Built on [Meta Wearables DAT SDK](https://github.com/facebook/meta-wearables-dat-ios) (iOS) / [DAT Android SDK](https://github.com/nichochar/openclaw) (Android) + Qwen VL API + [OpenClaw](https://github.com/nichochar/openclaw) (optional).
 
 **Supported platforms:** iOS (iPhone) and Android (Pixel, Samsung, etc.)
 
@@ -14,12 +16,12 @@ Built on [Meta Wearables DAT SDK](https://github.com/facebook/meta-wearables-dat
 
 Put on your glasses, tap the AI button, and talk:
 
-- **"What am I looking at?"** -- Gemini sees through your glasses camera and describes the scene
+- **"What am I looking at?"** -- Qwen sees through your glasses camera and describes the scene
 - **"Add milk to my shopping list"** -- delegates to OpenClaw, which adds it via your connected apps
 - **"Send a message to John saying I'll be late"** -- routes through OpenClaw to WhatsApp/Telegram/iMessage
 - **"Search for the best coffee shops nearby"** -- web search via OpenClaw, results spoken back
 
-The glasses camera streams at ~1fps to Gemini for visual context, while audio flows bidirectionally in real-time.
+The glasses camera streams at ~1fps to Qwen for visual context, while audio flows bidirectionally in real-time.
 
 ## How It Works
 
@@ -34,7 +36,7 @@ iOS / Android App (this project)
        |
        | JPEG frames (~1fps) + PCM audio (16kHz)
        v
-Gemini Live API (WebSocket)
+Qwen VL API (OpenAI-compatible REST/WebSocket)
        |
        |-- Audio response (PCM 24kHz) --> App --> Speaker
        |-- Tool calls (execute) -------> App --> OpenClaw Gateway
@@ -47,12 +49,12 @@ Gemini Live API (WebSocket)
        |<---- Tool response (text) <----- App <-------+
        |
        v
-  Gemini speaks the result
+  Qwen speaks the result
 ```
 
 **Key pieces:**
-- **Gemini Live** -- real-time voice + vision AI over WebSocket (native audio, not STT-first)
-- **OpenClaw** (optional) -- local gateway that gives Gemini access to 56+ tools and all your connected apps
+- **Qwen VL API** -- vision-language model via OpenAI-compatible endpoint (DashScope, Ollama, or any compatible backend)
+- **OpenClaw** (optional) -- local gateway that gives Qwen access to 56+ tools and all your connected apps
 - **Phone mode** -- test the full pipeline using your phone camera instead of glasses
 - **WebRTC streaming** -- share your glasses POV live to a browser viewer
 
@@ -63,8 +65,8 @@ Gemini Live API (WebSocket)
 ### 1. Clone and open
 
 ```bash
-git clone https://github.com/sseanliu/VisionClaw.git
-cd VisionClaw/samples/CameraAccess
+git clone https://github.com/tr10ne/visionqwen.git
+cd visionqwen/samples/CameraAccess
 open CameraAccess.xcodeproj
 ```
 
@@ -76,7 +78,16 @@ Copy the example file and fill in your values:
 cp CameraAccess/Secrets.swift.example CameraAccess/Secrets.swift
 ```
 
-Edit `Secrets.swift` with your [Gemini API key](https://aistudio.google.com/apikey) (required) and optional OpenClaw/WebRTC config.
+Edit `Secrets.swift` with your Qwen API key and endpoint (required) and optional OpenClaw/WebRTC config:
+
+```swift
+static let qwenApiKey = "YOUR_QWEN_API_KEY"
+static let qwenBaseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+// or "http://localhost:11434/v1" for local Ollama
+static let qwenModel = "qwen-vl-max"
+```
+
+Get a free API key at [DashScope](https://dashscope.aliyun.com/) or run locally via [Ollama](https://ollama.com/).
 
 ### 3. Build and run
 
@@ -86,7 +97,7 @@ Select your iPhone as the target device and hit Run (Cmd+R).
 
 **Without glasses (iPhone mode):**
 1. Tap **"Start on iPhone"** -- uses your iPhone's back camera
-2. Tap the **AI button** to start a Gemini Live session
+2. Tap the **AI button** to start a Qwen session
 3. Talk to the AI -- it can see through your iPhone camera
 
 **With Meta Ray-Ban glasses:**
@@ -101,7 +112,7 @@ First, enable Developer Mode in the Meta AI app:
 
 ![How to enable Developer Mode](assets/dev_mode.png)
 
-Then in VisionClaw:
+Then in VisionQwen:
 1. Tap **"Start Streaming"** in the app
 2. Tap the **AI button** for voice + vision conversation
 
@@ -112,7 +123,7 @@ Then in VisionClaw:
 ### 1. Clone and open
 
 ```bash
-git clone https://github.com/sseanliu/VisionClaw.git
+git clone https://github.com/tr10ne/visionqwen.git
 ```
 
 Open `samples/CameraAccessAndroid/` in Android Studio.
@@ -139,7 +150,13 @@ cd samples/CameraAccessAndroid/app/src/main/java/com/meta/wearable/dat/externals
 cp Secrets.kt.example Secrets.kt
 ```
 
-Edit `Secrets.kt` with your [Gemini API key](https://aistudio.google.com/apikey) (required) and optional OpenClaw/WebRTC config.
+Edit `Secrets.kt` with your Qwen API key and endpoint:
+
+```kotlin
+const val qwenApiKey = "YOUR_QWEN_API_KEY"
+const val qwenBaseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+const val qwenModel = "qwen-vl-max"
+```
 
 ### 4. Build and run
 
@@ -153,7 +170,7 @@ Edit `Secrets.kt` with your [Gemini API key](https://aistudio.google.com/apikey)
 
 **Without glasses (Phone mode):**
 1. Tap **"Start on Phone"** -- uses your phone's back camera
-2. Tap the **AI button** (sparkle icon) to start a Gemini Live session
+2. Tap the **AI button** (sparkle icon) to start a Qwen session
 3. Talk to the AI -- it can see through your phone camera
 
 **With Meta Ray-Ban glasses:**
@@ -166,7 +183,7 @@ Enable Developer Mode in the Meta AI app (same steps as iOS above), then:
 
 ## Setup: OpenClaw (Optional)
 
-OpenClaw gives Gemini the ability to take real-world actions: send messages, search the web, manage lists, control smart home devices, and more. Without it, Gemini is voice + vision only.
+OpenClaw gives Qwen the ability to take real-world actions: send messages, search the web, manage lists, control smart home devices, and more. Without it, Qwen is voice + vision only.
 
 ### 1. Install and configure OpenClaw
 
@@ -241,13 +258,13 @@ All source code is in `samples/CameraAccess/CameraAccess/`:
 
 | File | Purpose |
 |------|---------|
-| `Gemini/GeminiConfig.swift` | API keys, model config, system prompt |
-| `Gemini/GeminiLiveService.swift` | WebSocket client for Gemini Live API |
-| `Gemini/AudioManager.swift` | Mic capture (PCM 16kHz) + audio playback (PCM 24kHz) |
-| `Gemini/GeminiSessionViewModel.swift` | Session lifecycle, tool call wiring, transcript state |
+| `Qwen/QwenConfig.swift` | API keys, model config, system prompt |
+| `Qwen/QwenVLService.swift` | WebSocket/REST client for Qwen VL API |
+| `Qwen/AudioManager.swift` | Mic capture (PCM 16kHz) + audio playback (PCM 24kHz) |
+| `Qwen/QwenSessionViewModel.swift` | Session lifecycle, tool call wiring, transcript state |
 | `OpenClaw/ToolCallModels.swift` | Tool declarations, data types |
 | `OpenClaw/OpenClawBridge.swift` | HTTP client for OpenClaw gateway |
-| `OpenClaw/ToolCallRouter.swift` | Routes Gemini tool calls to OpenClaw |
+| `OpenClaw/ToolCallRouter.swift` | Routes Qwen tool calls to OpenClaw |
 | `iPhone/IPhoneCameraManager.swift` | AVCaptureSession wrapper for iPhone camera mode |
 | `WebRTC/WebRTCClient.swift` | WebRTC peer connection + SDP negotiation |
 | `WebRTC/SignalingClient.swift` | WebSocket signaling for WebRTC rooms |
@@ -258,13 +275,13 @@ All source code is in `samples/CameraAccessAndroid/app/src/main/java/.../cameraa
 
 | File | Purpose |
 |------|---------|
-| `gemini/GeminiConfig.kt` | API keys, model config, system prompt |
-| `gemini/GeminiLiveService.kt` | OkHttp WebSocket client for Gemini Live API |
-| `gemini/AudioManager.kt` | AudioRecord (16kHz) + AudioTrack (24kHz) |
-| `gemini/GeminiSessionViewModel.kt` | Session lifecycle, tool call wiring, UI state |
+| `qwen/QwenConfig.kt` | API keys, model config, system prompt |
+| `qwen/QwenVLService.kt` | OkHttp WebSocket/REST client for Qwen VL API |
+| `qwen/AudioManager.kt` | AudioRecord (16kHz) + AudioTrack (24kHz) |
+| `qwen/QwenSessionViewModel.kt` | Session lifecycle, tool call wiring, UI state |
 | `openclaw/ToolCallModels.kt` | Tool declarations, data classes |
 | `openclaw/OpenClawBridge.kt` | OkHttp HTTP client for OpenClaw gateway |
-| `openclaw/ToolCallRouter.kt` | Routes Gemini tool calls to OpenClaw |
+| `openclaw/ToolCallRouter.kt` | Routes Qwen tool calls to OpenClaw |
 | `phone/PhoneCameraManager.kt` | CameraX wrapper for phone camera mode |
 | `webrtc/WebRTCClient.kt` | WebRTC peer connection (stream-webrtc-android) |
 | `webrtc/SignalingClient.kt` | OkHttp WebSocket signaling for WebRTC rooms |
@@ -272,28 +289,28 @@ All source code is in `samples/CameraAccessAndroid/app/src/main/java/.../cameraa
 
 ### Audio Pipeline
 
-- **Input**: Phone mic -> AudioManager (PCM Int16, 16kHz mono, 100ms chunks) -> Gemini WebSocket
-- **Output**: Gemini WebSocket -> AudioManager playback queue -> Phone speaker
+- **Input**: Phone mic -> AudioManager (PCM Int16, 16kHz mono, 100ms chunks) -> Qwen API
+- **Output**: Qwen API -> AudioManager playback queue -> Phone speaker
 - **iOS iPhone mode**: Uses `.voiceChat` audio session for echo cancellation + mic gating during AI speech
 - **iOS Glasses mode**: Uses `.videoChat` audio session (mic is on glasses, speaker is on phone -- no echo)
 - **Android**: Uses `VOICE_COMMUNICATION` audio source for built-in acoustic echo cancellation
 
 ### Video Pipeline
 
-- **Glasses**: DAT SDK video stream (24fps) -> throttle to ~1fps -> JPEG (50% quality) -> Gemini
-- **Phone**: Camera capture (30fps) -> throttle to ~1fps -> JPEG -> Gemini
+- **Glasses**: DAT SDK video stream (24fps) -> throttle to ~1fps -> JPEG (50% quality) -> Qwen VL API
+- **Phone**: Camera capture (30fps) -> throttle to ~1fps -> JPEG -> Qwen VL API
 
 ### Tool Calling
 
-Gemini Live supports function calling. Both apps declare a single `execute` tool that routes everything through OpenClaw:
+Both apps declare a single `execute` tool that routes everything through OpenClaw:
 
 1. User says "Add eggs to my shopping list"
-2. Gemini speaks "Sure, adding that now" (verbal acknowledgment before tool call)
-3. Gemini sends `toolCall` with `execute(task: "Add eggs to the shopping list")`
+2. Qwen speaks "Sure, adding that now" (verbal acknowledgment before tool call)
+3. Qwen sends `toolCall` with `execute(task: "Add eggs to the shopping list")`
 4. `ToolCallRouter` sends HTTP POST to OpenClaw gateway
 5. OpenClaw executes the task using its 56+ connected skills
-6. Result returns to Gemini via `toolResponse`
-7. Gemini speaks the confirmation
+6. Result returns to Qwen via `toolResponse`
+7. Qwen speaks the confirmation
 
 ### WebRTC Live Streaming
 
@@ -310,7 +327,7 @@ Share your glasses POV in real-time to a browser viewer with bidirectional audio
 - **NAT traversal**: Google STUN servers + ExpressTURN relay (fetched from `/api/turn`)
 - **Video**: 24 fps, 2.5 Mbps max bitrate
 - **Background handling**: 60-second grace period for iOS app backgrounding -- room stays alive for reconnection
-- **Constraint**: Cannot run simultaneously with Gemini Live (audio device conflict)
+- **Constraint**: Cannot run simultaneously with Qwen Live session (audio device conflict)
 
 For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](samples/CameraAccess/CameraAccess/WebRTC/README.md).
 
@@ -321,7 +338,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 ### iOS
 - iOS 17.0+
 - Xcode 15.0+
-- Gemini API key ([get one free](https://aistudio.google.com/apikey))
+- Qwen API key ([DashScope](https://dashscope.aliyun.com/) or local [Ollama](https://ollama.com/))
 - Meta Ray-Ban glasses (optional -- use iPhone mode for testing)
 - OpenClaw on your Mac (optional -- for agentic actions)
 
@@ -329,7 +346,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 - Android 14+ (API 34+)
 - Android Studio Ladybug or newer
 - GitHub account with `read:packages` token (for DAT SDK)
-- Gemini API key ([get one free](https://aistudio.google.com/apikey))
+- Qwen API key ([DashScope](https://dashscope.aliyun.com/) or local [Ollama](https://ollama.com/))
 - Meta Ray-Ban glasses (optional -- use Phone mode for testing)
 - OpenClaw on your Mac (optional -- for agentic actions)
 
@@ -339,23 +356,23 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 
 ### General
 
-**Gemini doesn't hear me** -- Check that microphone permission is granted. The app uses aggressive voice activity detection -- speak clearly and at normal volume.
+**Qwen doesn't hear me** -- Check that microphone permission is granted. Speak clearly and at normal volume.
 
 **OpenClaw connection timeout** -- Make sure your phone and Mac are on the same Wi-Fi network, the gateway is running (`openclaw gateway restart`), and the hostname matches your Mac's Bonjour name.
 
-**OpenClaw opens duplicate browser tabs** -- This is a known upstream issue in OpenClaw's CDP (Chrome DevTools Protocol) connection management ([#13851](https://github.com/nichochar/openclaw/issues/13851), [#12317](https://github.com/nichochar/openclaw/issues/12317)). Using `profile: "openclaw"` (managed Chrome) instead of the default extension relay may improve stability.
+**OpenClaw opens duplicate browser tabs** -- This is a known upstream issue in OpenClaw's CDP connection management ([#13851](https://github.com/nichochar/openclaw/issues/13851), [#12317](https://github.com/nichochar/openclaw/issues/12317)). Using `profile: "openclaw"` (managed Chrome) instead of the default extension relay may improve stability.
 
 ### iOS-specific
 
-**"Gemini API key not configured"** -- Add your API key in Secrets.swift or in the in-app Settings.
+**"Qwen API key not configured"** -- Add your API key in Secrets.swift or in the in-app Settings.
 
 **Echo/feedback in iPhone mode** -- The app mutes the mic while the AI is speaking. If you still hear echo, try turning down the volume.
 
 ### Android-specific
 
-**Gradle sync fails with 401 Unauthorized** -- Your GitHub token is missing or doesn't have `read:packages` scope. Check `local.properties` for `gpr.user` and `gpr.token`. Generate a new token at [github.com/settings/tokens](https://github.com/settings/tokens).
+**Gradle sync fails with 401 Unauthorized** -- Your GitHub token is missing or doesn't have `read:packages` scope. Check `local.properties`. Generate a new token at [github.com/settings/tokens](https://github.com/settings/tokens).
 
-**Gemini WebSocket times out** -- The Gemini Live API sends binary WebSocket frames. If you're building a custom client, make sure to handle both text and binary frame types.
+**Qwen API timeout** -- Ensure your `qwenBaseUrl` is reachable from your phone. If using Ollama locally, make sure it's bound to `0.0.0.0` and not just `localhost`.
 
 **Audio not working** -- Ensure `RECORD_AUDIO` permission is granted. On Android 13+, you may need to grant this permission manually in Settings > Apps.
 
@@ -363,18 +380,12 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 
 For DAT SDK issues, see the [developer documentation](https://wearables.developer.meta.com/docs/develop/) or the [discussions forum](https://github.com/facebook/meta-wearables-dat-ios/discussions).
 
-## Citation
+---
 
-If you use VisionClaw in your research, please cite our paper:
+## Credits
 
-```bibtex
-@article{liu2026visionclaw,
-  title={VisionClaw: Always-On AI Agents through Smart Glasses},
-  author={Liu, Xiaoan and Lee, DaeHo and Gonzalez, Eric J and Gonzalez-Franco, Mar and Suzuki, Ryo},
-  journal={arXiv preprint arXiv:2604.03486},
-  year={2026}
-}
-```
+VisionQwen is a fork of [VisionClaw](https://github.com/sseanliu/VisionClaw) by Xiaoan Liu, DaeHo Lee, Eric J Gonzalez, Mar Gonzalez-Franco, and Ryo Suzuki.
+Original paper: [VisionClaw: Always-On AI Agents through Smart Glasses (arXiv:2604.03486)](https://arxiv.org/abs/2604.03486).
 
 ## License
 
