@@ -10,26 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Streaming token output support
 - Multi-turn conversation memory
-- Support for local Qwen models via Ollama
+- Support for additional local models via Ollama
 
 ## [1.0.0] - 2026-07-15
 
-### Added
-- Replaced Gemini Live API with Qwen VL via OpenAI-compatible API endpoints
-- Configurable `qwenBaseUrl` to use DashScope, Ollama, or any compatible backend
-- Configurable `qwenModel` field in `Secrets.swift` / `Secrets.kt`
-- Support for `qwen-vl-max` and other Qwen vision-language models
-
 ### Changed
-- `GeminiLiveService` refactored into `QwenVLService` with standard REST/WebSocket transport
-- `GeminiConfig` renamed to `QwenConfig`
-- `GeminiSessionViewModel` renamed to `QwenSessionViewModel`
+- Replaced Gemini Live API backend with Qwen VL via OpenAI-compatible API endpoint
+- `GeminiLiveService` now targets OpenAI-compatible REST/WebSocket instead of Gemini native protocol
+- `GeminiConfig` updated: `geminiAPIKey` / `geminiBaseURL` / `geminiModel` now point to Qwen endpoint
 - System prompt updated for Qwen instruction format
-- All references to Gemini API key replaced with Qwen API key configuration
+- Default model set to `qwen-vl-max`; compatible with any OpenAI-format vision model
 
-### Removed
-- Direct Gemini Live SDK dependency
-- Gemini-specific WebSocket framing
+### Notes
+- All original file and class names are preserved from the upstream VisionClaw codebase
+- To use DashScope: set `geminiBaseURL` to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
+- To use Ollama locally: set `geminiBaseURL` to `http://<host>:11434/v1`
 
 ---
 
