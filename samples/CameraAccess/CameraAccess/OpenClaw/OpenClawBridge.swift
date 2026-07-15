@@ -38,25 +38,27 @@ class OpenClawBridge: ObservableObject {
       return
     }
     connectionState = .checking
-    guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/v1/chat/completions") else {
+    // ИЗМЕНЕНО: endpoint /health вместо /v1/chat/completions для пинга
+    guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/health") else {
       connectionState = .unreachable("Invalid URL")
       return
     }
     var request = URLRequest(url: url)
     request.httpMethod = "GET"
+    // ИЗМЕНЕНО: Hermes использует простой Bearer token
     request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
-    request.setValue("glass", forHTTPHeaderField: "x-openclaw-message-channel")
+    // УДАЛЕНО: x-openclaw-message-channel — Hermes этого не понимает
     do {
       let (_, response) = try await pingSession.data(for: request)
       if let http = response as? HTTPURLResponse, (200...499).contains(http.statusCode) {
         connectionState = .connected
-        NSLog("[OpenClaw] Gateway reachable (HTTP %d)", http.statusCode)
+        NSLog("[OpenClaw] Hermes reachable (HTTP %d)", http.statusCode)
       } else {
         connectionState = .unreachable("Unexpected response")
       }
     } catch {
       connectionState = .unreachable(error.localizedDescription)
-      NSLog("[OpenClaw] Gateway unreachable: %@", error.localizedDescription)
+      NSLog("[OpenClaw] Hermes unreachable: %@", error.localizedDescription)
     }
   }
 
@@ -64,8 +66,6 @@ class OpenClawBridge: ObservableObject {
     conversationHistory = []
     NSLog("[OpenClaw] Session reset (key retained: %@)", sessionKey)
   }
-
-  // MARK: - Agent Chat (session continuity via x-openclaw-session-key header)
 
   func delegateTask(
     task: String,
@@ -78,28 +78,26 @@ class OpenClawBridge: ObservableObject {
       return .failure("Invalid gateway URL")
     }
 
-    // Append the new user message to conversation history
     conversationHistory.append(["role": "user", "content": task])
 
-    // Trim history to keep only the most recent turns (user+assistant pairs)
     if conversationHistory.count > maxHistoryTurns * 2 {
       conversationHistory = Array(conversationHistory.suffix(maxHistoryTurns * 2))
     }
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
+    // ИЗМЕНЕНО: только стандартные заголовки, без x-openclaw-*
     request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.setValue(sessionKey, forHTTPHeaderField: "x-openclaw-session-key")
-    request.setValue("glass", forHTTPHeaderField: "x-openclaw-message-channel")
 
     let body: [String: Any] = [
-      "model": "openclaw",
+      // ИЗМЕНЕНО: "openclaw" → "hermes" (или имя модели Hermes на вашем VPS)
+      "model": "hermes",
       "messages": conversationHistory,
       "stream": false
     ]
 
-    NSLog("[OpenClaw] Sending %d messages in conversation", conversationHistory.count)
+    NSLog("[OpenClaw] Sending %d messages to Hermes", conversationHistory.count)
 
     do {
       request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -119,20 +117,18 @@ class OpenClawBridge: ObservableObject {
          let first = choices.first,
          let message = first["message"] as? [String: Any],
          let content = message["content"] as? String {
-        // Append assistant response to history for continuity
         conversationHistory.append(["role": "assistant", "content": content])
-        NSLog("[OpenClaw] Agent result: %@", String(content.prefix(200)))
+        NSLog("[OpenClaw] Hermes result: %@", String(content.prefix(200)))
         lastToolCallStatus = .completed(toolName)
         return .success(content)
       }
 
       let raw = String(data: data, encoding: .utf8) ?? "OK"
       conversationHistory.append(["role": "assistant", "content": raw])
-      NSLog("[OpenClaw] Agent raw: %@", String(raw.prefix(200)))
       lastToolCallStatus = .completed(toolName)
       return .success(raw)
     } catch {
-      NSLog("[OpenClaw] Agent error: %@", error.localizedDescription)
+      NSLog("[OpenClaw] Hermes error: %@", error.localizedDescription)
       lastToolCallStatus = .failed(toolName, error.localizedDescription)
       return .failure("Agent error: \(error.localizedDescription)")
     }

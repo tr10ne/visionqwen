@@ -8,6 +8,9 @@ CameraAccess/FastVLM/models/
 # Local secrets (API keys, tokens)
 CameraAccess/Secrets.swift
 
+# Files .example
+CameraAccess/OpenClaw/*.example
+
 # Xcode workspace metadata
 *.xcworkspace/
 
