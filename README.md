@@ -4,11 +4,11 @@
 
 A real-time AI assistant for Meta Ray-Ban smart glasses powered by **Qwen** (or any OpenAI-compatible API). See what you see, hear what you say, and take actions on your behalf — all through voice.
 
-This is a fork of [VisionClaw](https://github.com/sseanliu/VisionClaw) with Gemini Live replaced by Qwen vision-language models via OpenAI-compatible endpoints.
+This is a fork of [VisionClaw](https://github.com/sseanliu/VisionClaw) with two key changes: Gemini Live replaced by Qwen VL via OpenAI-compatible API, and OpenClaw replaced by **Hermes** as the agentic tool backend.
 
 ![Cover](assets/cover.png)
 
-Built on [Meta Wearables DAT SDK](https://github.com/facebook/meta-wearables-dat-ios) (iOS) / [DAT Android SDK](https://github.com/nichochar/openclaw) (Android) + Qwen VL API + [OpenClaw](https://github.com/nichochar/openclaw) (optional).
+Built on [Meta Wearables DAT SDK](https://github.com/facebook/meta-wearables-dat-ios) (iOS) / [DAT Android SDK](https://github.com/nichochar/openclaw) (Android) + Qwen VL API + Hermes (optional).
 
 **Supported platforms:** iOS (iPhone) and Android (Pixel, Samsung, etc.)
 
@@ -17,9 +17,9 @@ Built on [Meta Wearables DAT SDK](https://github.com/facebook/meta-wearables-dat
 Put on your glasses, tap the AI button, and talk:
 
 - **"What am I looking at?"** -- Qwen sees through your glasses camera and describes the scene
-- **"Add milk to my shopping list"** -- delegates to OpenClaw, which adds it via your connected apps
-- **"Send a message to John saying I'll be late"** -- routes through OpenClaw to WhatsApp/Telegram/iMessage
-- **"Search for the best coffee shops nearby"** -- web search via OpenClaw, results spoken back
+- **"Add milk to my shopping list"** -- delegates to Hermes, which executes the task via your connected backend
+- **"Send a message to John saying I'll be late"** -- routes through Hermes to your messaging integrations
+- **"Search for the best coffee shops nearby"** -- web search via Hermes, results spoken back
 
 The glasses camera streams at ~1fps to Qwen for visual context, while audio flows bidirectionally in real-time.
 
@@ -39,10 +39,10 @@ iOS / Android App (this project)
 Qwen VL API (OpenAI-compatible endpoint)
        |
        |-- Audio response (PCM 24kHz) --> App --> Speaker
-       |-- Tool calls (execute) -------> App --> OpenClaw Gateway
+       |-- Tool calls (execute) -------> App --> Hermes Gateway
        |                                              |
        |                                              v
-       |                                      56+ skills: web search,
+       |                                      Agentic actions: web search,
        |                                      messaging, smart home,
        |                                      notes, reminders, etc.
        |                                              |
@@ -54,7 +54,7 @@ Qwen VL API (OpenAI-compatible endpoint)
 
 **Key pieces:**
 - **Qwen VL API** -- vision-language model via OpenAI-compatible endpoint (DashScope, Ollama, or any compatible backend)
-- **OpenClaw** (optional) -- local gateway that gives Qwen access to 56+ tools and all your connected apps
+- **Hermes** (optional) -- agentic gateway that gives Qwen the ability to take real-world actions; exposes a standard `/v1/chat/completions` + `/health` API with Bearer token auth
 - **Phone mode** -- test the full pipeline using your phone camera instead of glasses
 - **WebRTC streaming** -- share your glasses POV live to a browser viewer
 
@@ -78,7 +78,7 @@ Copy the example file and fill in your values:
 cp CameraAccess/Secrets.swift.example CameraAccess/Secrets.swift
 ```
 
-Edit `Secrets.swift` with your Qwen API key and endpoint (required) and optional OpenClaw/WebRTC config:
+Edit `Secrets.swift` with your Qwen API key and endpoint (required) and optional Hermes/WebRTC config:
 
 ```swift
 static let geminiAPIKey = "YOUR_QWEN_API_KEY"
@@ -87,7 +87,7 @@ static let geminiBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/
 static let geminiModel = "qwen-vl-max"
 ```
 
-> **Note:** Field names in `Secrets.swift` remain as-is from the original codebase. Set `geminiAPIKey` to your Qwen API key and `geminiBaseURL` to your OpenAI-compatible endpoint.
+> **Note:** Field names in `Secrets.swift` are unchanged from the original codebase. Set `geminiAPIKey` to your Qwen API key and `geminiBaseURL` to your OpenAI-compatible endpoint.
 
 Get a free API key at [DashScope](https://dashscope.aliyun.com/) or run locally via [Ollama](https://ollama.com/).
 
@@ -160,7 +160,7 @@ const val geminiBaseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v
 const val geminiModel = "qwen-vl-max"
 ```
 
-> **Note:** Field names in `Secrets.kt` remain as-is from the original codebase. Set `geminiApiKey` to your Qwen API key and `geminiBaseUrl` to your OpenAI-compatible endpoint.
+> **Note:** Field names in `Secrets.kt` are unchanged from the original codebase.
 
 ### 4. Build and run
 
@@ -185,72 +185,48 @@ Enable Developer Mode in the Meta AI app (same steps as iOS above), then:
 
 ---
 
-## Setup: OpenClaw (Optional)
+## Setup: Hermes (Optional)
 
-OpenClaw gives Qwen the ability to take real-world actions: send messages, search the web, manage lists, control smart home devices, and more. Without it, Qwen is voice + vision only.
+Hermes gives Qwen the ability to take real-world actions. Without it, Qwen operates in voice + vision only mode.
 
-### 1. Install and configure OpenClaw
+The app communicates with Hermes via a standard OpenAI-compatible `/v1/chat/completions` endpoint with Bearer token auth. Hermes must also expose a `/health` endpoint for connection checks.
 
-Follow the [OpenClaw setup guide](https://github.com/nichochar/openclaw). Make sure the gateway is enabled:
-
-In `~/.openclaw/openclaw.json`:
-
-```json
-{
-  "gateway": {
-    "port": 18789,
-    "bind": "lan",
-    "auth": {
-      "mode": "token",
-      "token": "your-gateway-token-here"
-    },
-    "http": {
-      "endpoints": {
-        "chatCompletions": { "enabled": true }
-      }
-    }
-  }
-}
-```
-
-Key settings:
-- `bind: "lan"` -- exposes the gateway on your local network so your phone can reach it
-- `chatCompletions.enabled: true` -- enables the `/v1/chat/completions` endpoint (off by default)
-- `auth.token` -- the token your app will use to authenticate
-
-### 2. Configure the app
+### Configure the app
 
 **iOS** -- In `Secrets.swift`:
 ```swift
-static let openClawHost = "http://Your-Mac.local"
+static let openClawHost = "http://your-hermes-host"
 static let openClawPort = 18789
-static let openClawGatewayToken = "your-gateway-token-here"
+static let openClawGatewayToken = "your-bearer-token-here"
 ```
 
 **Android** -- In `Secrets.kt`:
 ```kotlin
-const val openClawHost = "http://Your-Mac.local"
+const val openClawHost = "http://your-hermes-host"
 const val openClawPort = 18789
-const val openClawGatewayToken = "your-gateway-token-here"
+const val openClawGatewayToken = "your-bearer-token-here"
 ```
 
-To find your Mac's Bonjour hostname: **System Settings > General > Sharing** -- it's shown at the top (e.g., `Johns-MacBook-Pro.local`).
+> **Note:** The field names `openClawHost`, `openClawPort`, and `openClawGatewayToken` are unchanged from the original codebase but now point to your Hermes instance.
 
 > Both iOS and Android also have an in-app Settings screen where you can change these values at runtime without editing source code.
 
-### 3. Start the gateway
+### Hermes API contract
+
+The app expects your Hermes gateway to implement:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | `GET` | Connection check -- must return 2xx-4xx |
+| `/v1/chat/completions` | `POST` | Chat with `model: "hermes"`, standard OpenAI messages format |
+
+Auth: `Authorization: Bearer <token>` on all requests. No OpenClaw-specific headers (`x-openclaw-*`) are used.
+
+### Verify connection
 
 ```bash
-openclaw gateway restart
+curl -H "Authorization: Bearer your-token" http://your-hermes-host:18789/health
 ```
-
-Verify it's running:
-
-```bash
-curl http://localhost:18789/health
-```
-
-Now when you talk to the AI, it can execute tasks through OpenClaw.
 
 ---
 
@@ -267,8 +243,8 @@ All source code is in `samples/CameraAccess/CameraAccess/`:
 | `Gemini/AudioManager.swift` | Mic capture (PCM 16kHz) + audio playback (PCM 24kHz) |
 | `Gemini/GeminiSessionViewModel.swift` | Session lifecycle, tool call wiring, transcript state |
 | `OpenClaw/ToolCallModels.swift` | Tool declarations, data types |
-| `OpenClaw/OpenClawBridge.swift` | HTTP client for OpenClaw gateway |
-| `OpenClaw/ToolCallRouter.swift` | Routes tool calls to OpenClaw |
+| `OpenClaw/OpenClawBridge.swift` | HTTP client for Hermes gateway (`/health` ping + `/v1/chat/completions`) |
+| `OpenClaw/ToolCallRouter.swift` | Routes tool calls to Hermes |
 | `iPhone/IPhoneCameraManager.swift` | AVCaptureSession wrapper for iPhone camera mode |
 | `WebRTC/WebRTCClient.swift` | WebRTC peer connection + SDP negotiation |
 | `WebRTC/SignalingClient.swift` | WebSocket signaling for WebRTC rooms |
@@ -284,8 +260,8 @@ All source code is in `samples/CameraAccessAndroid/app/src/main/java/.../cameraa
 | `gemini/AudioManager.kt` | AudioRecord (16kHz) + AudioTrack (24kHz) |
 | `gemini/GeminiSessionViewModel.kt` | Session lifecycle, tool call wiring, UI state |
 | `openclaw/ToolCallModels.kt` | Tool declarations, data classes |
-| `openclaw/OpenClawBridge.kt` | OkHttp HTTP client for OpenClaw gateway |
-| `openclaw/ToolCallRouter.kt` | Routes tool calls to OpenClaw |
+| `openclaw/OpenClawBridge.kt` | HTTP client for Hermes gateway (`/health` ping + `/v1/chat/completions`) |
+| `openclaw/ToolCallRouter.kt` | Routes tool calls to Hermes |
 | `phone/PhoneCameraManager.kt` | CameraX wrapper for phone camera mode |
 | `webrtc/WebRTCClient.kt` | WebRTC peer connection (stream-webrtc-android) |
 | `webrtc/SignalingClient.kt` | OkHttp WebSocket signaling for WebRTC rooms |
@@ -306,13 +282,13 @@ All source code is in `samples/CameraAccessAndroid/app/src/main/java/.../cameraa
 
 ### Tool Calling
 
-Both apps declare a single `execute` tool that routes everything through OpenClaw:
+Both apps declare a single `execute` tool that routes everything through Hermes:
 
 1. User says "Add eggs to my shopping list"
 2. Qwen speaks "Sure, adding that now" (verbal acknowledgment before tool call)
 3. App sends `toolCall` with `execute(task: "Add eggs to the shopping list")`
-4. `ToolCallRouter` sends HTTP POST to OpenClaw gateway
-5. OpenClaw executes the task using its 56+ connected skills
+4. `ToolCallRouter` sends HTTP POST to Hermes at `/v1/chat/completions` with `model: "hermes"`
+5. Hermes executes the task
 6. Result returns via `toolResponse`
 7. Qwen speaks the confirmation
 
@@ -344,7 +320,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 - Xcode 15.0+
 - Qwen API key ([DashScope](https://dashscope.aliyun.com/) or local [Ollama](https://ollama.com/))
 - Meta Ray-Ban glasses (optional -- use iPhone mode for testing)
-- OpenClaw on your Mac (optional -- for agentic actions)
+- Hermes instance (optional -- for agentic actions)
 
 ### Android
 - Android 14+ (API 34+)
@@ -352,7 +328,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 - GitHub account with `read:packages` token (for DAT SDK)
 - Qwen API key ([DashScope](https://dashscope.aliyun.com/) or local [Ollama](https://ollama.com/))
 - Meta Ray-Ban glasses (optional -- use Phone mode for testing)
-- OpenClaw on your Mac (optional -- for agentic actions)
+- Hermes instance (optional -- for agentic actions)
 
 ---
 
@@ -362,13 +338,14 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 
 **AI doesn't hear me** -- Check that microphone permission is granted. Speak clearly and at normal volume.
 
-**OpenClaw connection timeout** -- Make sure your phone and Mac are on the same Wi-Fi network, the gateway is running (`openclaw gateway restart`), and the hostname matches your Mac's Bonjour name.
-
-**OpenClaw opens duplicate browser tabs** -- This is a known upstream issue in OpenClaw's CDP connection management ([#13851](https://github.com/nichochar/openclaw/issues/13851), [#12317](https://github.com/nichochar/openclaw/issues/12317)). Using `profile: "openclaw"` (managed Chrome) instead of the default extension relay may improve stability.
+**Hermes connection timeout** -- Make sure your phone can reach the Hermes host, the service is running, and the URL/port in Secrets is correct. Verify with:
+```bash
+curl -H "Authorization: Bearer your-token" http://your-hermes-host:18789/health
+```
 
 ### iOS-specific
 
-**"API key not configured"** -- Add your Qwen API key in Secrets.swift (`geminiAPIKey` field) or in the in-app Settings.
+**"API key not configured"** -- Add your Qwen API key in `Secrets.swift` (`geminiAPIKey` field) or in the in-app Settings.
 
 **Echo/feedback in iPhone mode** -- The app mutes the mic while the AI is speaking. If you still hear echo, try turning down the volume.
 
