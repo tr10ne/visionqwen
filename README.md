@@ -36,7 +36,7 @@ iOS / Android App (this project)
        |
        | JPEG frames (~1fps) + PCM audio (16kHz)
        v
-Qwen VL API (OpenAI-compatible REST/WebSocket)
+Qwen VL API (OpenAI-compatible endpoint)
        |
        |-- Audio response (PCM 24kHz) --> App --> Speaker
        |-- Tool calls (execute) -------> App --> OpenClaw Gateway
@@ -81,11 +81,13 @@ cp CameraAccess/Secrets.swift.example CameraAccess/Secrets.swift
 Edit `Secrets.swift` with your Qwen API key and endpoint (required) and optional OpenClaw/WebRTC config:
 
 ```swift
-static let qwenApiKey = "YOUR_QWEN_API_KEY"
-static let qwenBaseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+static let geminiAPIKey = "YOUR_QWEN_API_KEY"
+static let geminiBaseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 // or "http://localhost:11434/v1" for local Ollama
-static let qwenModel = "qwen-vl-max"
+static let geminiModel = "qwen-vl-max"
 ```
+
+> **Note:** Field names in `Secrets.swift` remain as-is from the original codebase. Set `geminiAPIKey` to your Qwen API key and `geminiBaseURL` to your OpenAI-compatible endpoint.
 
 Get a free API key at [DashScope](https://dashscope.aliyun.com/) or run locally via [Ollama](https://ollama.com/).
 
@@ -153,10 +155,12 @@ cp Secrets.kt.example Secrets.kt
 Edit `Secrets.kt` with your Qwen API key and endpoint:
 
 ```kotlin
-const val qwenApiKey = "YOUR_QWEN_API_KEY"
-const val qwenBaseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-const val qwenModel = "qwen-vl-max"
+const val geminiApiKey = "YOUR_QWEN_API_KEY"
+const val geminiBaseUrl = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+const val geminiModel = "qwen-vl-max"
 ```
+
+> **Note:** Field names in `Secrets.kt` remain as-is from the original codebase. Set `geminiApiKey` to your Qwen API key and `geminiBaseUrl` to your OpenAI-compatible endpoint.
 
 ### 4. Build and run
 
@@ -258,13 +262,13 @@ All source code is in `samples/CameraAccess/CameraAccess/`:
 
 | File | Purpose |
 |------|---------|
-| `Qwen/QwenConfig.swift` | API keys, model config, system prompt |
-| `Qwen/QwenVLService.swift` | WebSocket/REST client for Qwen VL API |
-| `Qwen/AudioManager.swift` | Mic capture (PCM 16kHz) + audio playback (PCM 24kHz) |
-| `Qwen/QwenSessionViewModel.swift` | Session lifecycle, tool call wiring, transcript state |
+| `Gemini/GeminiConfig.swift` | API keys, model config, system prompt |
+| `Gemini/GeminiLiveService.swift` | WebSocket client for Qwen VL API (OpenAI-compatible) |
+| `Gemini/AudioManager.swift` | Mic capture (PCM 16kHz) + audio playback (PCM 24kHz) |
+| `Gemini/GeminiSessionViewModel.swift` | Session lifecycle, tool call wiring, transcript state |
 | `OpenClaw/ToolCallModels.swift` | Tool declarations, data types |
 | `OpenClaw/OpenClawBridge.swift` | HTTP client for OpenClaw gateway |
-| `OpenClaw/ToolCallRouter.swift` | Routes Qwen tool calls to OpenClaw |
+| `OpenClaw/ToolCallRouter.swift` | Routes tool calls to OpenClaw |
 | `iPhone/IPhoneCameraManager.swift` | AVCaptureSession wrapper for iPhone camera mode |
 | `WebRTC/WebRTCClient.swift` | WebRTC peer connection + SDP negotiation |
 | `WebRTC/SignalingClient.swift` | WebSocket signaling for WebRTC rooms |
@@ -275,13 +279,13 @@ All source code is in `samples/CameraAccessAndroid/app/src/main/java/.../cameraa
 
 | File | Purpose |
 |------|---------|
-| `qwen/QwenConfig.kt` | API keys, model config, system prompt |
-| `qwen/QwenVLService.kt` | OkHttp WebSocket/REST client for Qwen VL API |
-| `qwen/AudioManager.kt` | AudioRecord (16kHz) + AudioTrack (24kHz) |
-| `qwen/QwenSessionViewModel.kt` | Session lifecycle, tool call wiring, UI state |
+| `gemini/GeminiConfig.kt` | API keys, model config, system prompt |
+| `gemini/GeminiLiveService.kt` | OkHttp WebSocket client for Qwen VL API (OpenAI-compatible) |
+| `gemini/AudioManager.kt` | AudioRecord (16kHz) + AudioTrack (24kHz) |
+| `gemini/GeminiSessionViewModel.kt` | Session lifecycle, tool call wiring, UI state |
 | `openclaw/ToolCallModels.kt` | Tool declarations, data classes |
 | `openclaw/OpenClawBridge.kt` | OkHttp HTTP client for OpenClaw gateway |
-| `openclaw/ToolCallRouter.kt` | Routes Qwen tool calls to OpenClaw |
+| `openclaw/ToolCallRouter.kt` | Routes tool calls to OpenClaw |
 | `phone/PhoneCameraManager.kt` | CameraX wrapper for phone camera mode |
 | `webrtc/WebRTCClient.kt` | WebRTC peer connection (stream-webrtc-android) |
 | `webrtc/SignalingClient.kt` | OkHttp WebSocket signaling for WebRTC rooms |
@@ -306,10 +310,10 @@ Both apps declare a single `execute` tool that routes everything through OpenCla
 
 1. User says "Add eggs to my shopping list"
 2. Qwen speaks "Sure, adding that now" (verbal acknowledgment before tool call)
-3. Qwen sends `toolCall` with `execute(task: "Add eggs to the shopping list")`
+3. App sends `toolCall` with `execute(task: "Add eggs to the shopping list")`
 4. `ToolCallRouter` sends HTTP POST to OpenClaw gateway
 5. OpenClaw executes the task using its 56+ connected skills
-6. Result returns to Qwen via `toolResponse`
+6. Result returns via `toolResponse`
 7. Qwen speaks the confirmation
 
 ### WebRTC Live Streaming
@@ -327,7 +331,7 @@ Share your glasses POV in real-time to a browser viewer with bidirectional audio
 - **NAT traversal**: Google STUN servers + ExpressTURN relay (fetched from `/api/turn`)
 - **Video**: 24 fps, 2.5 Mbps max bitrate
 - **Background handling**: 60-second grace period for iOS app backgrounding -- room stays alive for reconnection
-- **Constraint**: Cannot run simultaneously with Qwen Live session (audio device conflict)
+- **Constraint**: Cannot run simultaneously with an active AI session (audio device conflict)
 
 For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](samples/CameraAccess/CameraAccess/WebRTC/README.md).
 
@@ -356,7 +360,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 
 ### General
 
-**Qwen doesn't hear me** -- Check that microphone permission is granted. Speak clearly and at normal volume.
+**AI doesn't hear me** -- Check that microphone permission is granted. Speak clearly and at normal volume.
 
 **OpenClaw connection timeout** -- Make sure your phone and Mac are on the same Wi-Fi network, the gateway is running (`openclaw gateway restart`), and the hostname matches your Mac's Bonjour name.
 
@@ -364,7 +368,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 
 ### iOS-specific
 
-**"Qwen API key not configured"** -- Add your API key in Secrets.swift or in the in-app Settings.
+**"API key not configured"** -- Add your Qwen API key in Secrets.swift (`geminiAPIKey` field) or in the in-app Settings.
 
 **Echo/feedback in iPhone mode** -- The app mutes the mic while the AI is speaking. If you still hear echo, try turning down the volume.
 
@@ -372,7 +376,7 @@ For full details, see [`samples/CameraAccess/CameraAccess/WebRTC/README.md`](sam
 
 **Gradle sync fails with 401 Unauthorized** -- Your GitHub token is missing or doesn't have `read:packages` scope. Check `local.properties`. Generate a new token at [github.com/settings/tokens](https://github.com/settings/tokens).
 
-**Qwen API timeout** -- Ensure your `qwenBaseUrl` is reachable from your phone. If using Ollama locally, make sure it's bound to `0.0.0.0` and not just `localhost`.
+**API timeout** -- Ensure your `geminiBaseUrl` is reachable from your phone. If using Ollama locally, make sure it's bound to `0.0.0.0` and not just `localhost`.
 
 **Audio not working** -- Ensure `RECORD_AUDIO` permission is granted. On Android 13+, you may need to grant this permission manually in Settings > Apps.
 
