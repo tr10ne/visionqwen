@@ -98,7 +98,6 @@ class GeminiSessionViewModel: ObservableObject {
               self?.geminiService.sendToolResponse(callId: callId, output: output)
           }
       }
-  }
 
     // geminiService.onToolCall = { [weak self] toolCall in
     //   guard let self else { return }

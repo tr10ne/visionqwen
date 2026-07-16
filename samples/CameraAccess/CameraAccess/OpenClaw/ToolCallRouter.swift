@@ -48,9 +48,14 @@ class ToolCallRouter {
       NSLog("[ToolCall] Result for %@ (id: %@): %@",
             callName, callId, String(describing: result))
 
-        let response = result.outputString
-          sendResponse(callId, response)
-          self.inFlightTasks.removeValue(forKey: callId)
+//        let response = result.outputString
+//          sendResponse(callId, response)
+//          self.inFlightTasks.removeValue(forKey: callId)
+        let rawResponse = result.outputString
+            let response = "Answer to the user's question (\"\(taskDesc)\"): \(rawResponse)"
+
+            sendResponse(callId, response)
+            self.inFlightTasks.removeValue(forKey: callId)
     }
 
     inFlightTasks[callId] = task

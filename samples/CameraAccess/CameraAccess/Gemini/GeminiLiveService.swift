@@ -23,6 +23,15 @@ class GeminiLiveService: ObservableObject {
     // var onToolCall: ((GeminiToolCall) -> Void)?
     // var onToolCallCancellation: ((GeminiToolCallCancellation) -> Void)?
     var onToolCall: ((GeminiFunctionCall) -> Void)?
+    
+    private var latestPendingFrame: Data?
+    private var lastImageSentAt: Date = .distantPast
+    private var hasActiveResponse = false
+    private var responseCreatePending = false
+    
+    private var reconnectAttempt = 0
+    private var reconnectTask: Task<Void, Never>?
+    private var isIntentionalDisconnect = false
 
     private var lastUserSpeechEnd: Date?
     private var responseLatencyLogged = false
@@ -43,6 +52,7 @@ class GeminiLiveService: ObservableObject {
     }
 
     func connect() async -> Bool {
+        isIntentionalDisconnect = false
         guard let url = GeminiConfig.websocketURL() else {
             connectionState = .error("No API key configured")
             return false
@@ -71,6 +81,7 @@ class GeminiLiveService: ObservableObject {
                     self.isModelSpeaking = false
                     self.pendingFunctionCalls.removeAll()
                     self.onDisconnected?("Connection closed (code \(code.rawValue): \(reasonStr))")
+                    self.scheduleReconnect()
                 }
             }
 
@@ -83,6 +94,7 @@ class GeminiLiveService: ObservableObject {
                     self.isModelSpeaking = false
                     self.pendingFunctionCalls.removeAll()
                     self.onDisconnected?(msg)
+                    self.scheduleReconnect()
                 }
             }
 
@@ -107,6 +119,9 @@ class GeminiLiveService: ObservableObject {
     }
 
     func disconnect() {
+        isIntentionalDisconnect = true   
+        reconnectTask?.cancel()          
+        reconnectTask = nil
         receiveTask?.cancel()
         receiveTask = nil
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
@@ -121,33 +136,73 @@ class GeminiLiveService: ObservableObject {
         hasSentAudioOnce = false
         pendingFunctionCalls.removeAll()
         resolveConnect(success: false)
+        latestPendingFrame = nil
     }
 
+//    func sendAudio(data: Data) {
+//        guard connectionState == .ready else { return }
+//        sendQueue.async { [weak self] in
+//            guard let self else { return }
+//            let base64 = data.base64EncodedString()
+//            self.hasSentAudioOnce = true
+//            let json: [String: Any] = [
+//                "type": "input_audio_buffer.append",
+//                "audio": base64
+//            ]
+//            self.sendJSON(json)
+//        }
+//    }
     func sendAudio(data: Data) {
         guard connectionState == .ready else { return }
+
         sendQueue.async { [weak self] in
             guard let self else { return }
-            let base64 = data.base64EncodedString()
-            self.hasSentAudioOnce = true
-            let json: [String: Any] = [
+
+            self.sendJSON([
                 "type": "input_audio_buffer.append",
-                "audio": base64
-            ]
-            self.sendJSON(json)
+                "audio": data.base64EncodedString()
+            ])
+
+            self.hasSentAudioOnce = true
+
+            let now = Date()
+            if let jpegData = self.latestPendingFrame,
+               now.timeIntervalSince(self.lastImageSentAt) >= GeminiConfig.videoFrameInterval {
+                self.latestPendingFrame = nil
+                self.lastImageSentAt = now
+
+                self.sendJSON([
+                    "type": "input_image_buffer.append",
+                    "image": jpegData.base64EncodedString()
+                ])
+            }
         }
     }
-
+    
+//    func sendVideoFrame(image: UIImage) {
+//        guard connectionState == .ready, hasSentAudioOnce else { return }
+//        sendQueue.async { [weak self] in
+//            guard let self, let jpegData = image.jpegData(compressionQuality: GeminiConfig.videoJPEGQuality) else { return }
+//            guard jpegData.count < 190_000 else { return } // safety margin перед base64
+//            let base64 = jpegData.base64EncodedString()
+//            let json: [String: Any] = [
+//                "type": "input_image_buffer.append",
+//                "image": base64
+//            ]
+//            self.sendJSON(json)
+//        }
+//    }
     func sendVideoFrame(image: UIImage) {
-        guard connectionState == .ready, hasSentAudioOnce else { return }
+        guard connectionState == .ready else { return }
+
+        guard let jpegData = image.jpegData(
+            compressionQuality: GeminiConfig.videoJPEGQuality
+        ), jpegData.count < 190_000 else {
+            return
+        }
+
         sendQueue.async { [weak self] in
-            guard let self, let jpegData = image.jpegData(compressionQuality: GeminiConfig.videoJPEGQuality) else { return }
-            guard jpegData.count < 190_000 else { return } // safety margin перед base64
-            let base64 = jpegData.base64EncodedString()
-            let json: [String: Any] = [
-                "type": "input_image_buffer.append",
-                "image": base64
-            ]
-            self.sendJSON(json)
+            self?.latestPendingFrame = jpegData
         }
     }
 
@@ -156,9 +211,12 @@ class GeminiLiveService: ObservableObject {
     //         self?.sendJSON(response)
     //     }
     // }
+
     func sendToolResponse(callId: String, output: String) {
         sendQueue.async { [weak self] in
-            self?.sendJSON([
+            guard let self else { return }
+
+            self.sendJSON([
                 "event_id": "event_\(UUID().uuidString)",
                 "type": "conversation.item.create",
                 "item": [
@@ -167,7 +225,18 @@ class GeminiLiveService: ObservableObject {
                     "output": output
                 ]
             ])
-            self?.sendJSON(["event_id": "event_\(UUID().uuidString)", "type": "response.create"])
+
+            if !self.hasActiveResponse {
+                self.sendJSON([
+                    "event_id": "event_\(UUID().uuidString)",
+                    "type": "response.create"
+                ])
+            } else {
+                NSLog("[Gemini] Active response in progress — queuing tool result")
+                self.responseCreatePending = true
+            }
+
+            NSLog("[Gemini] Tool response sent for call_id: %@", callId)
         }
     }
 
@@ -187,7 +256,46 @@ class GeminiLiveService: ObservableObject {
         }
     }
 
+    func cancelToolCall(callId: String) {
+        guard connectionState == .ready else { return }
+        sendQueue.async { [weak self] in
+            self?.sendJSON([
+                "event_id": "event_\(UUID().uuidString)",
+                "type": "conversation.item.create",
+                "item": [
+                    "type": "function_call_output",
+                    "call_id": callId,
+                    "output": "{\"error\": \"cancelled_by_user\"}"
+                ]
+            ])
+        }
+    }
+
     // MARK: - Private
+
+    private func scheduleReconnect() {
+        guard !isIntentionalDisconnect else { return }
+        guard reconnectAttempt < 6 else {
+            NSLog("[Gemini] Max reconnect attempts reached, giving up")
+            return
+        }
+
+        let base = 1.0
+        let cap = 20.0
+        let delay = min(cap, base * pow(2.0, Double(reconnectAttempt)))
+        let jitter = Double.random(in: 0...0.5)
+        let totalDelay = delay + jitter
+
+        reconnectAttempt += 1
+        NSLog("[Gemini] Reconnecting in %.1fs (attempt %d)", totalDelay, reconnectAttempt)
+
+        reconnectTask?.cancel()
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(totalDelay * 1_000_000_000))
+            guard let self, !Task.isCancelled else { return }
+            _ = await self.connect()
+        }
+    }
 
     private func resolveConnect(success: Bool) {
         if let cont = connectContinuation {
@@ -253,6 +361,7 @@ class GeminiLiveService: ObservableObject {
                             self.isModelSpeaking = false
                             self.pendingFunctionCalls.removeAll()
                             self.onDisconnected?(reason)
+                            self.scheduleReconnect()
                         }
                     }
                     break
@@ -271,11 +380,13 @@ class GeminiLiveService: ObservableObject {
         switch type {
         case "session.created", "session.updated":
             connectionState = .ready
+            reconnectAttempt = 0 
             resolveConnect(success: true)
 
         case "input_audio_buffer.speech_started":
             isModelSpeaking = false
             pendingFunctionCalls.removeAll()
+            hasActiveResponse = false
             onInterrupted?()
 
         case "input_audio_buffer.speech_stopped":
@@ -307,12 +418,21 @@ class GeminiLiveService: ObservableObject {
                 NSLog("[Gemini] You: %@", transcript)
                 onInputTranscription?(transcript)
             }
+            
+        case "response.created":
+            hasActiveResponse = true
 
         case "response.done":
             isModelSpeaking = false
             pendingFunctionCalls.removeAll()
             responseLatencyLogged = false
+            hasActiveResponse = false
             onTurnComplete?()
+            
+            if responseCreatePending {
+                responseCreatePending = false
+                sendJSON(["event_id": "event_\(UUID().uuidString)", "type": "response.create"])
+            }
 
         case "response.output_item.added":
             if let item = json["item"] as? [String: Any],
@@ -339,6 +459,7 @@ class GeminiLiveService: ObservableObject {
         case "error":
             let msg = (json["error"] as? [String: Any])?["message"] as? String ?? "Unknown server error"
             NSLog("[Gemini] Server error: %@", msg)
+            hasActiveResponse = false
             connectionState = .error(msg)
 
         default:

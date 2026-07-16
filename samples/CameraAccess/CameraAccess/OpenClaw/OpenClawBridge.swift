@@ -19,6 +19,10 @@ class OpenClawBridge: ObservableObject {
   private let maxHistoryTurns = 10
 
   private static let stableSessionKey = "agent:main:glass"
+  private var currentTask: URLSessionDataTask?
+    
+  private var activeTaskCount = 0
+  private let maxConcurrentTasks = 1
 
   init() {
     let config = URLSessionConfiguration.default
@@ -68,15 +72,22 @@ class OpenClawBridge: ObservableObject {
   }
 
   func delegateTask(
-    task: String,
-    toolName: String = "execute"
+      task: String,
+      toolName: String = "execute"
   ) async -> ToolResult {
-    lastToolCallStatus = .executing(toolName)
+      guard activeTaskCount < maxConcurrentTasks else {
+          NSLog("[OpenClaw] Rejecting overlapping task, already executing")
+          return .failure("busy: already executing a previous request")
+      }
+      activeTaskCount += 1
+      defer { activeTaskCount -= 1 }
 
-    guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/v1/chat/completions") else {
-      lastToolCallStatus = .failed(toolName, "Invalid URL")
-      return .failure("Invalid gateway URL")
-    }
+      lastToolCallStatus = .executing(toolName)
+
+      guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/v1/chat/completions") else {
+          lastToolCallStatus = .failed(toolName, "Invalid URL")
+          return .failure("Invalid gateway URL")
+      }
 
     conversationHistory.append(["role": "user", "content": task])
 
@@ -101,7 +112,9 @@ class OpenClawBridge: ObservableObject {
 
     do {
       request.httpBody = try JSONSerialization.data(withJSONObject: body)
+      try Task.checkCancellation()
       let (data, response) = try await session.data(for: request)
+      try Task.checkCancellation()
       let httpResponse = response as? HTTPURLResponse
 
       guard let statusCode = httpResponse?.statusCode, (200...299).contains(statusCode) else {
@@ -109,6 +122,9 @@ class OpenClawBridge: ObservableObject {
         let bodyStr = String(data: data, encoding: .utf8) ?? "no body"
         NSLog("[OpenClaw] Chat failed: HTTP %d - %@", code, String(bodyStr.prefix(200)))
         lastToolCallStatus = .failed(toolName, "HTTP \(code)")
+        if conversationHistory.last?["role"] == "user" {
+            conversationHistory.removeLast()
+        }
         return .failure("Agent returned HTTP \(code)")
       }
 
@@ -127,10 +143,23 @@ class OpenClawBridge: ObservableObject {
       conversationHistory.append(["role": "assistant", "content": raw])
       lastToolCallStatus = .completed(toolName)
       return .success(raw)
-    } catch {
-      NSLog("[OpenClaw] Hermes error: %@", error.localizedDescription)
-      lastToolCallStatus = .failed(toolName, error.localizedDescription)
-      return .failure("Agent error: \(error.localizedDescription)")
-    }
+    } catch is CancellationError {
+          // ИЗМЕНЕНО: явная обработка отмены — убираем незакрытый user-turn,
+          // чтобы следующий запрос не унаследовал рассинхронизированную историю
+          NSLog("[OpenClaw] Task cancelled by user, cleaning up history")
+          if conversationHistory.last?["role"] == "user" {
+              conversationHistory.removeLast()
+          }
+          lastToolCallStatus = .failed(toolName, "cancelled")
+          return .failure("cancelled")
+      } catch {
+          NSLog("[OpenClaw] Hermes error: %@", error.localizedDescription)
+          // ИЗМЕНЕНО: тоже чистим историю при любой другой ошибке сети
+          if conversationHistory.last?["role"] == "user" {
+              conversationHistory.removeLast()
+          }
+          lastToolCallStatus = .failed(toolName, error.localizedDescription)
+          return .failure("Agent error: \(error.localizedDescription)")
+      }
   }
 }

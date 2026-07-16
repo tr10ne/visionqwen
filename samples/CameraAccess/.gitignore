@@ -10,6 +10,7 @@ CameraAccess/Secrets.swift
 
 # Files .example
 CameraAccess/OpenClaw/*.example
+CameraAccess/Gemini/*.example
 
 # Xcode workspace metadata
 *.xcworkspace/
