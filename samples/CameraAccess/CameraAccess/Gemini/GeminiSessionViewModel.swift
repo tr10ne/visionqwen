@@ -208,5 +208,5 @@ class GeminiSessionViewModel: ObservableObject {
     lastVideoFrameTime = now
     geminiService.sendVideoFrame(image: image)
   }
-
+  }
 }
