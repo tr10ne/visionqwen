@@ -7,6 +7,7 @@ final class SettingsManager {
 
   private enum Key: String {
     case geminiAPIKey
+    case geminiModel
     case openClawHost
     case openClawPort
     case openClawHookToken
@@ -30,6 +31,11 @@ final class SettingsManager {
   var geminiSystemPrompt: String {
     get { defaults.string(forKey: Key.geminiSystemPrompt.rawValue) ?? GeminiConfig.defaultSystemInstruction }
     set { defaults.set(newValue, forKey: Key.geminiSystemPrompt.rawValue) }
+  }
+
+  var geminiModel: String {
+    get { defaults.string(forKey: Key.geminiModel.rawValue) ?? GeminiConfig.defaultModel }
+    set { defaults.set(newValue, forKey: Key.geminiModel.rawValue) }
   }
 
   // MARK: - OpenClaw
@@ -87,8 +93,16 @@ final class SettingsManager {
 
   // MARK: - Reset
 
+  // func resetAll() {
+  //   for key in [Key.geminiAPIKey, .geminiSystemPrompt, .openClawHost, .openClawPort,
+  //               .openClawHookToken, .openClawGatewayToken, .webrtcSignalingURL,
+  //               .speakerOutputEnabled, .videoStreamingEnabled,
+  //               .proactiveNotificationsEnabled] {
+  //     defaults.removeObject(forKey: key.rawValue)
+  //   }
+  // }
   func resetAll() {
-    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .openClawHost, .openClawPort,
+    for key in [Key.geminiAPIKey, .geminiModel, .geminiSystemPrompt, .openClawHost, .openClawPort,
                 .openClawHookToken, .openClawGatewayToken, .webrtcSignalingURL,
                 .speakerOutputEnabled, .videoStreamingEnabled,
                 .proactiveNotificationsEnabled] {

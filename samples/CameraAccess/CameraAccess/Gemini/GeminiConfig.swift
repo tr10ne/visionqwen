@@ -2,7 +2,9 @@ import Foundation
 
 enum GeminiConfig {
     static let websocketBaseURL = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
-    static let model = "qwen3.5-omni-flash-realtime"
+    // static let model = "qwen3.5-omni-flash-realtime"
+    static let defaultModel = "qwen3.5-omni-flash-realtime"
+    static var model: String { SettingsManager.shared.geminiModel }
     static let voice = "Ethan" // варианты: Cherry, Ethan, Chelsie, Serena — см. voice list [web:237][web:245]
 
     static let inputAudioSampleRate: Double = 16000

@@ -15,6 +15,7 @@ struct SettingsView: View {
   @State private var videoStreamingEnabled: Bool = true
   @State private var proactiveNotificationsEnabled: Bool = true
   @State private var showResetConfirmation = false
+  @State private var geminiModel: String = ""
 
   var body: some View {
     NavigationView {
@@ -29,6 +30,13 @@ struct SettingsView: View {
               .disableAutocorrection(true)
               .font(.system(.body, design: .monospaced))
           }
+        }
+
+        Section(header: Text("Model"), footer: Text("Realtime model ID used for the WebSocket connection. Changes take effect on the next Gemini session.")) {
+          TextField("Model name", text: $geminiModel)
+            .autocapitalization(.none)
+            .disableAutocorrection(true)
+            .font(.system(.body, design: .monospaced))
         }
 
         Section(header: Text("System Prompt"), footer: Text("Customize the AI assistant's behavior and personality. Changes take effect on the next Gemini session.")) {
@@ -144,6 +152,7 @@ struct SettingsView: View {
 
   private func loadCurrentValues() {
     geminiAPIKey = settings.geminiAPIKey
+    geminiModel = settings.geminiModel 
     geminiSystemPrompt = settings.geminiSystemPrompt
     openClawHost = settings.openClawHost
     openClawPort = String(settings.openClawPort)
@@ -157,6 +166,7 @@ struct SettingsView: View {
 
   private func save() {
     settings.geminiAPIKey = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    settings.geminiModel = geminiModel.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.geminiSystemPrompt = geminiSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.openClawHost = openClawHost.trimmingCharacters(in: .whitespacesAndNewlines)
     if let port = Int(openClawPort.trimmingCharacters(in: .whitespacesAndNewlines)) {
